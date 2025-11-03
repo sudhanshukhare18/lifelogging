@@ -36,8 +36,12 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
 
+ALLOWED_HOSTS = [
+    '127.0.0.1', 
+    'localhost', 
+    '.render.com' # Required for Render deployment
+]
 CORS_ALLOW_ALL_ORIGINS = True
 # Application definition
 
