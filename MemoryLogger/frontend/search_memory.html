@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Search Memories</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+        h2 { text-align: center; }
+        input[type="text"] { width: 70%; padding: 10px; box-sizing: border-box; }
+        button { padding: 10px 15px; background-color: #28a745; color: white; border: none; cursor: pointer; margin-left: 10px; }
+        .nav-links a { margin-right: 15px; }
+        .memory-card { border: 1px solid #eee; padding: 15px; margin-top: 10px; border-radius: 4px; background-color: #f9f9f9; }
+        .memory-card p { margin: 5px 0; }
+        .emotion { font-weight: bold; color: #ff6347; }
+        #message { margin-top: 15px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="nav-links">
+        <a href="add_memory.html">➕ Add Memory</a>
+        <a href="search_memory.html">🔍 Search Memories</a>
+        <button onclick="logout()" style="background-color: #dc3545; float: right;">Logout</button>
+    </div>
+    <hr>
+    
+    <h2>Semantic Search</h2>
+    
+    <input type="text" id="search-query" placeholder="Search your memories (e.g., 'A happy day I spent with my dog')" required>
+    <button onclick="handleSearch()">Search</button>
+
+    <div id="results-container">
+        </div>
+    <p id="message"></p>
+
+    <script>
+       // frontend/search_memory.html (Find this line in the <script> block)
+const API_BASE = 'https://automatic-space-bassoon-69457jw9p5qgf4qv9-8000.app.github.dev/api/'; // <-- UPDATED
+        
+        // --- Utility Functions (Same as in add_memory.html) ---
+        function getAccessToken() {
+            return localStorage.getItem('access');
+        }
+        function saveTokens(access, refresh) {
+            localStorage.setItem('access', access);
+            localStorage.setItem('refresh', refresh);
+        }
+        function logout() {
+            localStorage.removeItem('access');
+            localStorage.removeItem('refresh');
+            window.location.href = 'index.html';
+        }
+        async function authenticatedFetch(url, options = {}) {
+            const token = getAccessToken();
+            if (!token) {
+                logout(); 
+                return;
+            }
+            options.headers = { ...options.headers, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+            let response = await fetch(url, options);
+            if (response.status === 401 && !options._retry) {
+                const refresh = localStorage.getItem('refresh');
+                const refreshResponse = await fetch(API_BASE + 'token/refresh/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh }) });
+                if (refreshResponse.ok) {
+                    const data = await refreshResponse.json();
+                    saveTokens(data.access, refresh); 
+                    options._retry = true;
+                    return authenticatedFetch(url, options);
+                } else {
+                    logout(); 
+                    return;
+                }
+            }
+            return response;
+        }
+
+        // --- Handlers ---
+
+        function renderResults(memories) {
+            const container = document.getElementById('results-container');
+            container.innerHTML = '<h3>Search Results:</h3>';
+
+            if (memories.length === 0) {
+                container.innerHTML += '<p>No matching memories found.</p>';
+                return;
+            }
+
+            memories.forEach(memory => {
+                const date = new Date(memory.created_at).toLocaleDateString();
+                const card = `
+                    <div class="memory-card">
+                        <p><strong>Date:</strong> ${date}</p>
+                        <p><strong>Content:</strong> ${memory.text_content.substring(0, 200)}...</p>
+                        <p><strong class="emotion">Emotion:</strong> ${memory.emotion_label.toUpperCase()}</p>
+                    </div>
+                `;
+                container.innerHTML += card;
+            });
+        }
+        
+        async function handleSearch() {
+            const query = document.getElementById('search-query').value.trim();
+            const messageEl = document.getElementById('message');
+            
+            if (query.length < 3) {
+                messageEl.textContent = "Search query is too short.";
+                messageEl.style.color = 'red';
+                return;
+            }
+
+            messageEl.textContent = "Searching memories using AI embeddings...";
+            messageEl.style.color = 'blue';
+
+            try {
+                const response = await authenticatedFetch(API_BASE + 'memories/search-semantic/', {
+                    method: 'POST',
+                    body: JSON.stringify({ query: query })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    renderResults(data.results);
+                    messageEl.textContent = `Search complete. Found ${data.results.length} results.`;
+                    messageEl.style.color = 'green';
+                } else {
+                    messageEl.textContent = `Search failed: ${data.error || JSON.stringify(data)}`;
+                    messageEl.style.color = 'red';
+                }
+            } catch (error) {
+                messageEl.textContent = 'Network error or failed to connect to API.';
+                messageEl.style.color = 'red';
+            }
+        }
+
+        // Check login on load
+        if (!getAccessToken()) {
+            logout();
+        } else {
+            // Optional: Load all memories initially (using the standard GET endpoint)
+            // handleListAllMemories();
+        }
+    </script>
+</body>
+</html>

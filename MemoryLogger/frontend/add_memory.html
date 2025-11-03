@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Add New Memory</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+        h2 { text-align: center; }
+        textarea { width: 100%; height: 150px; padding: 10px; margin: 8px 0; box-sizing: border-box; resize: vertical; }
+        button { padding: 10px 15px; background-color: #007bff; color: white; border: none; cursor: pointer; margin-right: 10px; }
+        #message { margin-top: 15px; font-weight: bold; }
+        .nav-links a { margin-right: 15px; }
+    </style>
+</head>
+<body>
+
+    <div class="nav-links">
+        <a href="add_memory.html">➕ Add Memory</a>
+        <a href="search_memory.html">🔍 Search Memories</a>
+        <button onclick="logout()" style="background-color: #dc3545; float: right;">Logout</button>
+    </div>
+    <hr>
+    
+    <h2>Share Your Experience</h2>
+    
+    <textarea id="memory-content" placeholder="Type your memory here... What happened? How did you feel?" required></textarea>
+    <button onclick="handleAddMemory()">Save Memory (AI Processed)</button>
+
+    <p id="message"></p>
+
+    <script>
+       // frontend/add_memory.html (Find this line in the <script> block)
+const API_BASE = 'https://automatic-space-bassoon-69457jw9p5qgf4qv9-8000.app.github.dev/api/'; // <-- UPDATED 
+        
+        // --- Utility Functions (Repeat from index.html or load from a separate file) ---
+        function getAccessToken() {
+            return localStorage.getItem('access');
+        }
+
+        function saveTokens(access, refresh) {
+            localStorage.setItem('access', access);
+            localStorage.setItem('refresh', refresh);
+        }
+
+        function logout() {
+            localStorage.removeItem('access');
+            localStorage.removeItem('refresh');
+            window.location.href = 'index.html';
+        }
+
+        async function authenticatedFetch(url, options = {}) {
+            const token = getAccessToken();
+            if (!token) {
+                logout(); // If no token, redirect to login
+                return;
+            }
+
+            options.headers = {
+                ...options.headers,
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            };
+
+            let response = await fetch(url, options);
+
+            // Handle token expiration: Try refreshing
+            if (response.status === 401 && !options._retry) {
+                const refresh = localStorage.getItem('refresh');
+                const refreshResponse = await fetch(API_BASE + 'token/refresh/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ refresh })
+                });
+
+                if (refreshResponse.ok) {
+                    const data = await refreshResponse.json();
+                    saveTokens(data.access, refresh); // Save new access token
+                    
+                    // Retry original request with the new token
+                    options._retry = true;
+                    return authenticatedFetch(url, options);
+                } else {
+                    logout(); // Refresh failed, force re-login
+                    return;
+                }
+            }
+
+            return response;
+        }
+
+        // --- Handler ---
+
+        async function handleAddMemory() {
+            const content = document.getElementById('memory-content').value.trim();
+            const messageEl = document.getElementById('message');
+            
+            if (content.length < 5) {
+                messageEl.textContent = "Memory content is too short.";
+                messageEl.style.color = 'red';
+                return;
+            }
+
+            messageEl.textContent = "Processing memory with AI...";
+            messageEl.style.color = 'blue';
+
+            try {
+                const response = await authenticatedFetch(API_BASE + 'memories/', {
+                    method: 'POST',
+                    body: JSON.stringify({ text_content: content })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    messageEl.textContent = `Memory saved successfully! Emotion: ${data.emotion_label}`;
+                    messageEl.style.color = 'green';
+                    document.getElementById('memory-content').value = ''; // Clear input
+                } else {
+                    messageEl.textContent = `Failed to save memory: ${JSON.stringify(data)}`;
+                    messageEl.style.color = 'red';
+                }
+            } catch (error) {
+                messageEl.textContent = 'Network error or token expired.';
+                messageEl.style.color = 'red';
+            }
+        }
+
+        // Check login on load
+        if (!getAccessToken()) {
+            logout();
+        }
+    </script>
+</body>
+</html>

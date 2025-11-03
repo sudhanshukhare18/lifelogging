@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Memory Logger - Login/Register</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 400px; margin: 50px auto; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+        h2 { text-align: center; }
+        input { width: 100%; padding: 10px; margin: 8px 0; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background-color: #4CAF50; color: white; border: none; cursor: pointer; margin-top: 10px; }
+        #message { margin-top: 15px; color: red; }
+    </style>
+</head>
+<body>
+
+    <h2>AI Memory Logger</h2>
+    
+    <h3>Register</h3>
+    <input type="text" id="reg-username" placeholder="Username" required>
+    <input type="email" id="reg-email" placeholder="Email" required>
+    <input type="password" id="reg-password" placeholder="Password" required>
+    <button onclick="handleRegister()">Register</button>
+    <hr>
+    
+    <h3>Login</h3>
+    <input type="text" id="login-username" placeholder="Username" required>
+    <input type="password" id="login-password" placeholder="Password" required>
+    <button onclick="handleLogin()">Login</button>
+
+    <p id="message"></p>
+
+    <script>
+        // Check your Codespace URL in the address bar and ensure it matches the domain below.
+        const API_BASE = 'https://automatic-space-bassoon-69457jw9p5qgf4qv9-8000.app.github.dev/api/'; 
+        
+        // --- Utility Functions ---
+
+        function saveTokens(access, refresh) {
+            localStorage.setItem('access', access);
+            localStorage.setItem('refresh', refresh);
+        }
+
+        function getAccessToken() {
+            return localStorage.getItem('access');
+        }
+        
+        function isAuthenticated() {
+            return !!getAccessToken();
+        }
+
+        function displayMessage(msg, isError = true) {
+            const el = document.getElementById('message');
+            el.textContent = msg;
+            el.style.color = isError ? 'red' : 'green';
+        }
+
+        /**
+         * Pings the API base URL with a non-data-sending method (HEAD)
+         * to check connectivity and CORS status on page load.
+         */
+        async function checkBackendConnection() {
+            try {
+                // We use the bare API_BASE, which should resolve to the API Root (Django 404/API List)
+                const response = await fetch(API_BASE, { method: 'HEAD' }); 
+                
+                if (response.ok || response.status === 404) {
+                    // 200 means success, 404 means Django is definitely running 
+                    // and responding, and CORS passed.
+                    console.log('✅ BACKEND STATUS: Connection successful. CORS is likely working.');
+                    console.log('Django server responded with status:', response.status);
+                } else {
+                    // This catches 401s, 500s, or unexpected non-network errors.
+                    console.error('⚠️ BACKEND STATUS: Connection failed with HTTP status:', response.status);
+                    console.warn('CORS may still be an issue, but the server is definitely reachable.');
+                }
+            } catch (error) {
+                // This typically catches network errors, DNS failure, or a definite CORS block.
+                console.error('❌ BACKEND STATUS: Connection failed. Check CORS configuration or server status.');
+                console.error('Error details:', error);
+                
+                if (error instanceof TypeError && error.message.includes('fetch')) {
+                    // If the error message is vague, remind the user about the CORS setting
+                    console.warn('HINT: If the server is running, this usually indicates a CORS block (missing Access-Control-Allow-Origin header).');
+                }
+            }
+        }
+
+
+        // --- Handlers ---
+
+        async function handleRegister() {
+            const username = document.getElementById('reg-username').value;
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-password').value;
+
+            try {
+                const response = await fetch(API_BASE + 'auth/register/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password })
+                });
+
+                const data = await response.json();
+                console.log('Registration attempt response status:', response.status);
+
+                if (response.ok) {
+                    displayMessage(`Registration successful for ${data.username}! Please log in.`, false);
+                } else {
+                    // Display specific error detail if available
+                    const detail = data.detail || JSON.stringify(data);
+                    displayMessage(`Registration failed: ${detail}`);
+                }
+            } catch (error) {
+                displayMessage('Network error during registration.');
+                console.error('Registration fetch error:', error);
+            }
+        }
+
+        async function handleLogin() {
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+
+            try {
+                const response = await fetch(API_BASE + 'token/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+                console.log('Login attempt response status:', response.status);
+
+                if (response.ok) {
+                    saveTokens(data.access, data.refresh);
+                    displayMessage('Login successful! Redirecting...', false);
+                    // Redirect to the memory creation page
+                    window.location.href = 'add_memory.html'; 
+                } else {
+                    // Display specific error detail if available
+                    const detail = data.detail || `Invalid credentials.`;
+                    displayMessage(`Login failed: ${detail}`);
+                }
+            } catch (error) {
+                displayMessage('Network error during login.');
+                console.error('Login fetch error:', error);
+            }
+        }
+        
+        // --- Initialization ---
+        
+        // 1. Check if the user is already logged in
+        if (isAuthenticated()) {
+             window.location.href = 'add_memory.html';
+        }
+
+        // 2. Run the connection check on page load
+        checkBackendConnection();
+
+    </script>
+</body>
+</html>
