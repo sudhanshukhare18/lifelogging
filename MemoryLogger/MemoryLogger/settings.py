@@ -40,7 +40,8 @@ DEBUG = True
 ALLOWED_HOSTS = [
     '127.0.0.1', 
     'localhost', 
-    '.render.com' # Required for Render deployment
+    '.render.com',            # Allows all Render subdomains
+    'lifelogging.onrender.com' # ADD your specific domain name
 ]
 CORS_ALLOW_ALL_ORIGINS = True
 # Application definition
